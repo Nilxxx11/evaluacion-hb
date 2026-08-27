@@ -56,6 +56,16 @@
     z-index: 200;
     box-shadow: 0 3px 16px rgba(18,48,110,0.28);
   }
+  /* Ajustes de interfaz: jerarquía visual, foco y mejor lectura. */
+  .topbar { min-height: 72px; }
+  .card { border-radius: 14px; }
+  .card:hover { border-color: #9dbbe8; }
+  .field input, .field select, .field textarea { background: #f8fbff; }
+  .rating-row, .vial-row { border-bottom-color: #e5edf8; }
+  .rating-text, .vial-text { color: #40516f; }
+  .score-panel { border-top: 4px solid var(--accent); border-radius: 14px; }
+  .actions .btn { width: 100%; justify-content: center; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(26,92,190,.24); outline-offset: 2px; }
   .topbar-brand { display: flex; align-items: center; gap: 12px; }
   .topbar-logo {
     width: 36px; height: 36px;
@@ -388,10 +398,6 @@
       <span id="fb-status" style="font-size:12px;color:rgba(255,255,255,0.75);">⬤ Conectando...</span>
     </div>
   </div>
-  <div class="topbar-meta">
-    <span class="badge" id="fb-status">⬤</span>
-    <button class="btn btn-ghost" onclick="showRecords()" style="padding:8px 14px;font-size:12px;">📋 Registros</button>
-  </div>
 </div>
 
 <div class="page-layout">
@@ -498,27 +504,6 @@
     </div>
   </div>
 
-  <!-- RECORDS -->
-  <div class="records-section" id="records-section" style="display:none;">
-    <div class="card">
-      <div class="section-label">Evaluaciones Guardadas</div>
-      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-        <div class="field" style="flex:1;min-width:160px;"><input id="search-records" placeholder="Buscar por nombre o cédula…" oninput="filterRecords()"></div>
-        <button class="btn btn-outline" onclick="exportAllXLSX()" style="padding:10px 16px;font-size:12px;">📊 Exportar Todos</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th><th>Cédula</th><th>Tipo</th><th>Cargo</th>
-              <th>Evaluador</th><th>Fecha</th><th>Resultado</th><th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="records-body"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
 </div><!-- end .container -->
 
 <!-- SIDEBAR -->
@@ -813,9 +798,16 @@ function initFirebase(cfg) {
   try {
     if (!firebase.apps.length) firebase.initializeApp(cfg);
     db = firebase.database();
+    const pdfKey = new URLSearchParams(window.location.search).get('pdf');
+    if (pdfKey) {
+      db.ref('evaluaciones/' + pdfKey).once('value').then(snap => {
+        const record = snap.val();
+        if (!record) { showToast('❌ Registro no encontrado'); return; }
+        exportPDF({ key: pdfKey, ...record });
+      }).catch(error => showToast('❌ No fue posible generar el PDF: ' + error.message));
+    }
     document.getElementById('fb-status').textContent = '⬤ Conectado';
     document.getElementById('fb-status').style.color = '#36d399';
-    loadRecords();
     showToast('✅ conectado');
   } catch(e) {
     document.getElementById('fb-status').textContent = '⬤ Error de conexión';
@@ -1621,7 +1613,8 @@ function exportPDF(data) {
 }
 
 // ─── EVENT DELEGATION TABLA REGISTROS ────────────────────────────────────────
-document.getElementById('records-body').addEventListener('click', function(e) {
+const recordsBody = document.getElementById("records-body");
+if (recordsBody) recordsBody.addEventListener("click", function(e) {
   const loadBtn = e.target.closest('.rec-load');
   const xlsxBtn = e.target.closest('.rec-xlsx');
   const pdfBtn  = e.target.closest('.rec-pdf');
